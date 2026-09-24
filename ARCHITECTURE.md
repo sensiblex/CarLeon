@@ -1,104 +1,106 @@
-# CarLeon 
+# Архитектура
+## 1. Общая архитектура
 
-## Структура проекта
+```mermaid
+flowchart TB
+    UI[React Frontend<br/>TypeScript + Tailwind]
+    API[FastAPI Backend<br/>Python]
+    DB[(PostgreSQL<br/>База данных)]
+    SC[Smart Contract<br/>Solidity]
+    HH[Hardhat<br/>Локальный блокчейн]
 
-```
-CarLeon/
-├── backend/                 # FastAPI бэкенд
-│   ├── app/
-│   │   ├── api/            # API роуты
-│   │   │   └── v1/         # API версия 1
-│   │   ├── core/           # Основная конфигурация (безопасность, настройки)
-│   │   ├── models/         # SQLAlchemy ORM модели
-│   │   ├── schemas/        # Pydantic схемы (request/response)
-│   │   ├── services/       # Слой бизнес-логики
-│   │   ├── db/             # Управление сессиями БД
-│   │   └── main.py         # Точка входа FastAPI приложения
-│   ├── tests/              # Тесты бэкенда
-│   ├── alembic/            # Миграции БД
-│   ├── requirements.txt    # Python зависимости
-│   └── .env                # Переменные окружения
-│
-├── frontend/               # React фронтенд
-│   ├── src/
-│   │   ├── components/     # Переиспользуемые UI компоненты
-│   │   ├── pages/          # Компоненты страниц
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── services/       # API вызовы
-│   │   ├── utils/          # Утилитные функции
-│   │   ├── context/        # React context провайдеры
-│   │   ├── types/          # TypeScript типы
-│   │   └── App.tsx         # Главный React компонент
-│   ├── public/             # Статические файлы
-│   ├── package.json        # Node зависимости
-│   └── .env                # Переменные окружения
-│
-└── README.md              # Документация проекта
+    UI -->|REST API| API
+    UI -->|Чтение статусов| SC
+    API -->|SQLAlchemy| DB
+    API -->|Подпись транзакций| SC
+    SC --- HH
 ```
 
-## Структура бэкенда (FastAPI)
+**Описание:**
+- Frontend обращается к Backend через REST API
+- Frontend читает статусы напрямую из блокчейна через viem
+- Backend хранит данные в PostgreSQL
+- Backend подписывает транзакции смены статуса сервисным кошельком
 
-### `app/api/v1/`
-- Определения API endpoints
-- Обработчики роутов
-- Валидация request/response
+---
 
-### `app/core/`
-- Настройки конфигурации
-- Безопасность (JWT, хеширование паролей)
-- CORS настройки
-- Подключение к БД
+## 2. Жизненный цикл сделки
 
-### `app/models/`
-- SQLAlchemy ORM модели
-- Определения таблиц БД
+```mermaid
+stateDiagram-v2
+    [*] --> Published: Поставщик публикует авто
+    Published --> OrderCreated: Заказ оформлен
+    OrderCreated --> DepositPaid: Депозит оплачен
+    DepositPaid --> Purchased: Авто выкуплен
+    Purchased --> InTransitOrigin: В пути (страна отправки)
+    InTransitOrigin --> Customs: Таможня
+    Customs --> InTransitRF: В пути (РФ)
+    InTransitRF --> DeliveredCity: Доставлен в город
+    DeliveredCity --> ReadyForPickup: Готов к выдаче
+    ReadyForPickup --> Completed: Завершено
+    Completed --> [*]
+```
 
-### `app/schemas/`
-- Pydantic модели для валидации
-- Схемы request/response
+**Статусы в блокчейне:** 0-9
 
-### `app/services/`
-- Бизнес-логика
-- Обработка данных
-- Интеграции с внешними API
+---
 
-### `app/db/`
-- Управление сессиями БД
-- Инициализация подключения
+## 3. Структура базы данных
 
-## Структура фронтенда (React)
+```mermaid
+erDiagram
+    USERS ||--o{ CARS : publishes
+    USERS ||--o{ DEALS : creates
+    CARS ||--o{ DEALS : included_in
+    
+    USERS {
+        uuid id PK
+        string email
+        string password_hash
+        string role
+        string first_name
+        string last_name
+    }
+    
+    CARS {
+        uuid id PK
+        uuid supplier_id FK
+        string brand
+        string model
+        integer year
+        decimal price
+        string country
+        string photos
+    }
+    
+    DEALS {
+        uuid id PK
+        uuid car_id FK
+        uuid customer_id FK
+        uuid supplier_id FK
+        integer current_status
+        decimal total_amount
+        string destination_city
+    }
+```
 
-### `src/components/`
-- Переиспользуемые UI компоненты
-- Atomic design паттерн
-- Презентационные компоненты
+---
 
-### `src/pages/`
-- Компоненты уровня страниц
-- Обработчики роутов
-- Сложные UI сборки
+## 4. Смена статуса сделки
 
-### `src/hooks/`
-- Custom React hooks
-- Управление состоянием
-- Hooks для интеграции с API
-
-### `src/services/`
-- Функции API клиента
-- HTTP запросы к бэкенду
-- Логика получения данных
-
-### `src/utils/`
-- Helper функции
-- Константы
-- Форматтеры
-
-### `src/context/`
-- React Context провайдеры
-- Глобальное управление состоянием
-- Контекст аутентификации
-
-### `src/types/`
-- Определения TypeScript типов
-- Интерфейсы
-- Type guards
+```mermaid
+sequenceDiagram
+    participant S as Поставщик
+    participant UI as Frontend
+    participant API as Backend
+    participant DB as PostgreSQL
+    participant BC as Blockchain
+    
+    S->>UI: Обновляет статус
+    UI->>API: PUT /deals/{id}/status
+    API->>DB: Обновление в БД
+    API->>BC: Транзакция смены статуса
+    BC->>BC: Запись в блок
+    BC-->>API: Подтверждение
+    API-->>UI: Успех
+```
