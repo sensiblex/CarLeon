@@ -1,0 +1,12 @@
+services:
+  backend:
+    build: ./backend
+    container_name: carleon-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - blockchain-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  blockchain-data:
