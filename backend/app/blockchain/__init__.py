@@ -1,5 +1,4 @@
-from .transaction import StatusChange
-from .block import Block
-from .chain import Blockchain
+from app.blockchain.chain import Blockchain
+from app.blockchain.transaction import DealStatus, StatusChange
 
-__all__ = ["StatusChange", "Block", "Blockchain"]
+__all__ = ["Blockchain", "StatusChange", "DealStatus"]

@@ -1,8 +1,21 @@
+# Python
 __pycache__/
 *.pyc
-.env
 .venv/
 venv/
-node_modules/
-backend/data/
 .pytest_cache/
+*.egg-info/
+.coverage
+
+# Env
+.env
+
+# Runtime data
+backend/data/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+test.db
