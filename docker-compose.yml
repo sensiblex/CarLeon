@@ -12,6 +12,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  frontend:
+    build: ./frontend
+    container_name: carleon-frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
   postgres:
     image: postgres:16-alpine
     environment:

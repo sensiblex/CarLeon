@@ -13,6 +13,7 @@ os.environ.setdefault("API_KEY", "test-key")
 os.environ.setdefault("CHAIN_JSON_PATH", str(Path(tempfile.mkdtemp()) / "chain.json"))
 
 from app.db.base import Base  # noqa: E402
+from app.api.deps import get_db_session  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app import models  # noqa: F401,E402
@@ -36,7 +37,9 @@ def client(tmp_path, monkeypatch):
         finally:
             db.close()
 
+    # эндпоинты зависят от get_db_session, поэтому подменяем обе зависимости
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db_session] = override_get_db
 
     # Изолируем JSON-цепочку под каждый тест
     chain_path = tmp_path / "chain.json"
