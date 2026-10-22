@@ -145,6 +145,6 @@ flowchart LR
 ## Документация
 
 - [Структура проекта](structure.md)
-- [Архитектура](architecture.md)
+- [Архитектура](ARCHITECTURE.md)
 - [Формат данных](data_format.md)
 - [Аналитика](analytics.md)

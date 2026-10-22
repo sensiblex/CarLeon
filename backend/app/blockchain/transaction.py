@@ -20,11 +20,11 @@ class DealStatus(IntEnum):
 @dataclass
 class StatusChange:
     deal_id: str
-    status: int
+    status: DealStatus
     timestamp: float = field(default_factory=time.time)
 
     def __post_init__(self):
-        DealStatus(self.status)
+        self.status = DealStatus(self.status)
 
     def to_dict(self) -> dict:
         return asdict(self)
