@@ -14,6 +14,7 @@ BLOCK_HASH_MISMATCH = "block_hash_mismatch"
 PREVIOUS_HASH_MISMATCH = "previous_hash_mismatch"
 RECORD_HASH_MISMATCH = "record_hash_mismatch"
 FILE_MISMATCH = "file_mismatch"
+BLOCK_ALREADY_PRESENT = "block_already_present"
 
 
 @dataclass
@@ -30,6 +31,12 @@ class ChainError:
         return asdict(self)
 
 
+class InvalidBlockError(ValueError):
+    def __init__(self, errors: list[ChainError]):
+        self.errors = errors
+        super().__init__("; ".join(error.message for error in errors))
+
+
 class Blockchain:
     def __init__(self, chain: list[Block] | None = None):
         self.chain: list[Block] = chain if chain else [self.create_genesis_block()]
@@ -38,8 +45,9 @@ class Blockchain:
     def create_genesis_block() -> Block:
         block = Block(
             index=0,
-            transactions=[StatusChange(deal_id="genesis", status=0)],
+            transactions=[StatusChange(deal_id="genesis", status=0, timestamp=0.0)],
             previous_hash=GENESIS_PREVIOUS_HASH,
+            timestamp=0.0,
         )
         block.hash = block.calculate_hash()
         return block
@@ -57,6 +65,69 @@ class Blockchain:
         block.hash = block.calculate_hash()
         self.chain.append(block)
         return block
+
+    def validate_next_block(self, block: Block) -> list[ChainError]:
+        """Check a peer block without changing local state."""
+        errors = self.validate()
+        if errors:
+            return errors
+
+        if any(existing.hash == block.hash for existing in self.chain):
+            return [ChainError(
+                BLOCK_ALREADY_PRESENT,
+                f"блок с хэшем {block.hash} уже есть в цепочке",
+                block_index=block.index,
+                actual=block.hash,
+            )]
+
+        expected_index = len(self.chain)
+        if block.index != expected_index:
+            errors.append(ChainError(
+                INDEX_MISMATCH,
+                f"ожидался блок с index={expected_index}, получен {block.index}",
+                block_index=block.index,
+                expected=str(expected_index),
+                actual=str(block.index),
+            ))
+
+        expected_previous_hash = self.last_block.hash
+        if block.previous_hash != expected_previous_hash:
+            errors.append(ChainError(
+                PREVIOUS_HASH_MISMATCH,
+                "previous_hash блока не совпадает с хэшем последнего локального блока",
+                block_index=block.index,
+                expected=expected_previous_hash,
+                actual=block.previous_hash,
+            ))
+
+        recalculated_hash = block.calculate_hash()
+        if block.hash != recalculated_hash:
+            errors.append(ChainError(
+                BLOCK_HASH_MISMATCH,
+                "хэш полученного блока не совпадает с пересчитанным",
+                block_index=block.index,
+                expected=recalculated_hash,
+                actual=block.hash,
+            ))
+
+        for tx_index, tx in enumerate(block.transactions):
+            expected_content_hash = tx.calculate_content_hash()
+            if tx.content_hash != expected_content_hash:
+                errors.append(ChainError(
+                    RECORD_HASH_MISMATCH,
+                    f"содержимое записи {tx_index} не совпадает с её хэшем",
+                    block_index=block.index,
+                    tx_index=tx_index,
+                    expected=expected_content_hash,
+                    actual=tx.content_hash,
+                ))
+        return errors
+
+    def append_peer_block(self, block: Block) -> None:
+        errors = self.validate_next_block(block)
+        if errors:
+            raise InvalidBlockError(errors)
+        self.chain.append(block)
 
     # ---------- проверка целостности ----------
 

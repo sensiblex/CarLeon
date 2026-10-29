@@ -45,6 +45,7 @@ def client(tmp_path, monkeypatch):
     chain_path = tmp_path / "chain.json"
     monkeypatch.setattr("app.core.config.settings.CHAIN_JSON_PATH", chain_path)
     monkeypatch.setattr("app.api.deps._blockchain_service", None)
+    monkeypatch.setattr("app.api.deps._network_service", None)
 
     with TestClient(app) as c:
         yield c

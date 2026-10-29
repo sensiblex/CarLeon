@@ -3,6 +3,7 @@ import { Layout } from './components/Layout'
 import { ChainPage } from './pages/ChainPage'
 import { DealPage } from './pages/DealPage'
 import { DealsPage } from './pages/DealsPage'
+import { NetworkPage } from './pages/NetworkPage'
 import { TrackPage } from './pages/TrackPage'
 
 function NotFound() {
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="deals" element={<DealsPage />} />
         <Route path="deals/:trackCode" element={<DealPage />} />
         <Route path="blockchain" element={<ChainPage />} />
+        <Route path="network" element={<NetworkPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

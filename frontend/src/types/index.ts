@@ -65,3 +65,45 @@ export interface ValidationReport {
   first_break?: ChainError | null
   errors: ChainError[]
 }
+
+export interface NetworkNodeInfo {
+  node_id: string
+  network_id: string
+  genesis_hash: string | null
+  block_count: number
+  height: number
+  head_hash: string | null
+  valid: boolean
+}
+
+export interface PeerStatus {
+  peer_id: string
+  reachable: boolean
+  compatible: boolean
+  node: NetworkNodeInfo | null
+  error: string | { code: string; message: string; details?: unknown } | null
+}
+
+export interface BlockReceipt {
+  accepted: boolean
+  node_id: string
+  index: number
+  hash: string
+  block_count: number
+  head_hash: string
+  validation: ValidationReport
+}
+
+export interface InvalidBlockEvidence {
+  accepted: boolean
+  peer_id: string
+  rejected_hash: string
+  error: {
+    code: string
+    message: string
+    errors?: ChainError[]
+  }
+  receiver_before: NetworkNodeInfo
+  receiver_after: NetworkNodeInfo
+  receiver_unchanged: boolean
+}

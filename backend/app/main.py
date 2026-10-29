@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.deps import configure_network_service
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.base import Base
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
     # На dev-режиме создаём таблицы автоматически (в проде — Alembic)
     Base.metadata.create_all(bind=engine)
     app.state.blockchain = BlockchainService(Path(settings.CHAIN_JSON_PATH))
+    app.state.network = configure_network_service(app.state.blockchain)
     yield
 
 

@@ -1,25 +1,65 @@
 services:
-  backend:
+  node-a:
     build: ./backend
-    container_name: carleon-backend
+    container_name: carleon-node-a
     ports:
       - "8000:8000"
     volumes:
-      - blockchain-data:/app/data
+      - node-a-data:/app/data
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://carleon:carleon@postgres:5432/carleon
+      API_KEY: change-me
+      APP_ENV: demo
+      NODE_ID: node-a
+      NETWORK_ID: carleon-demo-v1
+      CHAIN_JSON_PATH: /app/data/blockchain.json
+      PEERS_JSON: '[{"id":"node-b","url":"http://node-b:8000"}]'
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  node-b:
+    build: ./backend
+    container_name: carleon-node-b
+    ports:
+      - "8001:8000"
+    volumes:
+      - node-b-data:/app/data
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://carleon:carleon@postgres:5432/carleon
+      API_KEY: change-me
+      APP_ENV: demo
+      NODE_ID: node-b
+      NETWORK_ID: carleon-demo-v1
+      CHAIN_JSON_PATH: /app/data/blockchain.json
+      PEERS_JSON: '[{"id":"node-a","url":"http://node-a:8000"}]'
+    depends_on:
+      node-a:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
   frontend:
     build: ./frontend
     container_name: carleon-frontend
     ports:
-      - "3000:80"
+      - "3001:80"
     restart: unless-stopped
     depends_on:
-      - backend
+      node-a:
+        condition: service_healthy
+      node-b:
+        condition: service_healthy
   postgres:
     image: postgres:16-alpine
     environment:
@@ -33,4 +73,5 @@ services:
       retries: 10
       start_period: 30s
 volumes:
-  blockchain-data:
+  node-a-data:
+  node-b-data:

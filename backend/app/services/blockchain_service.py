@@ -1,5 +1,7 @@
 from pathlib import Path
+from threading import RLock
 
+from app.blockchain.block import Block
 from app.blockchain.chain import Blockchain
 from app.blockchain.storage import load_chain, save_chain
 from app.blockchain.transaction import DealStatus, StatusChange, hash_file
@@ -8,6 +10,7 @@ from app.blockchain.transaction import DealStatus, StatusChange, hash_file
 class BlockchainService:
     def __init__(self, path: Path):
         self.path = path
+        self._lock = RLock()
         self.chain: Blockchain = load_chain(path)
 
     def record(
@@ -19,17 +22,35 @@ class BlockchainService:
             ValueError: недопустимый статус.
             FileNotFoundError: указанный файл не существует.
         """
-        file_hash = None
-        if file_path is not None:
-            if not Path(file_path).is_file():
-                raise FileNotFoundError(file_path)
-            file_hash = hash_file(file_path)
-        tx = StatusChange(
-            deal_id=deal_id, status=status, file_path=file_path, file_hash=file_hash
-        )
-        block = self.chain.add_block([tx])
-        save_chain(self.chain, self.path)
-        return block.hash, block.index
+        with self._lock:
+            file_hash = None
+            if file_path is not None:
+                if not Path(file_path).is_file():
+                    raise FileNotFoundError(file_path)
+                file_hash = hash_file(file_path)
+            tx = StatusChange(
+                deal_id=deal_id, status=status, file_path=file_path, file_hash=file_hash
+            )
+            block = self.chain.add_block([tx])
+            try:
+                self.persist()
+            except OSError:
+                self.chain.chain.pop()
+                raise
+            return block.hash, block.index
+
+    def persist(self) -> None:
+        with self._lock:
+            save_chain(self.chain, self.path)
+
+    def accept_peer_block(self, block: Block) -> None:
+        with self._lock:
+            self.chain.append_peer_block(block)
+            try:
+                self.persist()
+            except OSError:
+                self.chain.chain.pop()
+                raise
 
     def is_valid(self) -> bool:
         return self.chain.is_valid()

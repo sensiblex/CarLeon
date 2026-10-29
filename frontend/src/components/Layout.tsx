@@ -7,6 +7,7 @@ const links = [
   { to: '/', label: 'Отследить', end: true },
   { to: '/deals', label: 'Сделки', end: false },
   { to: '/blockchain', label: 'Блокчейн', end: false },
+  { to: '/network', label: 'Сеть нод', end: false },
 ]
 
 function ApiKeyControl() {
@@ -50,12 +51,12 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-8">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-8">
             <NavLink to="/" className="text-lg font-bold tracking-tight text-slate-900">
               Car<span className="text-brand-500">Leon</span>
             </NavLink>
-            <nav className="flex gap-1">
+            <nav className="flex flex-wrap gap-1">
               {links.map((l) => (
                 <NavLink
                   key={l.to}

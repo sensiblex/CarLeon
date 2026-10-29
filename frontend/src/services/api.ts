@@ -1,8 +1,13 @@
 import type {
   ApiResponse,
+  Block,
+  BlockReceipt,
   ChainDump,
   Deal,
   DealCreate,
+  InvalidBlockEvidence,
+  NetworkNodeInfo,
+  PeerStatus,
   StatusChange,
   TrackingPoint,
   ValidationReport,
@@ -22,6 +27,16 @@ function errorMessage(body: unknown, fallback: string): string {
   if (body && typeof body === 'object') {
     const b = body as { detail?: unknown; error?: unknown }
     if (typeof b.detail === 'string') return b.detail
+    if (b.detail && typeof b.detail === 'object') {
+      const detail = b.detail as { message?: unknown; errors?: unknown }
+      const message = typeof detail.message === 'string' ? detail.message : ''
+      const errors = Array.isArray(detail.errors)
+        ? detail.errors
+            .map((e) => (e && typeof e === 'object' && 'message' in e ? String(e.message) : ''))
+            .filter(Boolean)
+        : []
+      return [message, ...errors].filter(Boolean).join(': ') || fallback
+    }
     // Ошибки валидации FastAPI: detail — массив объектов
     if (Array.isArray(b.detail)) {
       return b.detail
@@ -90,4 +105,30 @@ export const api = {
   verifyFiles: () => request<ValidationReport>('/blockchain/files/verify'),
   dealHistory: (dealId: string) =>
     request<StatusChange[]>(`/blockchain/deals/${encodeURIComponent(dealId)}/history`),
+
+  // Node-to-node network API
+  getNodeInfo: (apiKey: string) =>
+    request<NetworkNodeInfo>('/network/info', { apiKey }),
+  getPeers: (apiKey: string) =>
+    request<PeerStatus[]>('/network/peers', { apiKey }),
+  getPeerInfo: (peerId: string, apiKey: string) =>
+    request<PeerStatus>(`/network/peers/${encodeURIComponent(peerId)}/info`, { apiKey }),
+  getPeerBlock: (peerId: string, hash: string, apiKey: string) =>
+    request<Block>(`/network/peers/${encodeURIComponent(peerId)}/blocks/${encodeURIComponent(hash)}`, { apiKey }),
+  sendBlock: (peerId: string, hash: string, apiKey: string) =>
+    request<BlockReceipt>(
+      `/network/peers/${encodeURIComponent(peerId)}/blocks/${encodeURIComponent(hash)}/send`,
+      { method: 'POST', apiKey },
+    ),
+  probeInvalidBlock: (peerId: string, apiKey: string) =>
+    request<InvalidBlockEvidence>(`/network/peers/${encodeURIComponent(peerId)}/invalid-block-demo`, {
+      method: 'POST',
+      apiKey,
+    }),
+  addStatusChange: (dealId: string, status: number, apiKey: string) =>
+    request<{ tx_hash: string; block_index: number }>('/blockchain/status', {
+      method: 'POST',
+      body: { deal_id: dealId, status },
+      apiKey,
+    }),
 }
