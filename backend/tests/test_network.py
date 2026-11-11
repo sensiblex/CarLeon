@@ -118,6 +118,7 @@ def test_duplicate_block_is_rejected(client):
 
     assert first.status_code == 200
     assert duplicate.status_code == 422
+    assert duplicate.json()["detail"]["code"] == "block_already_present"
     assert any(
         error["type"] == "block_already_present"
         for error in duplicate.json()["detail"]["errors"]

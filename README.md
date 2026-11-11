@@ -63,18 +63,24 @@ docker compose up --build
 ---
 
 ## Блокчейн
-- В контракте хранится только история статусов
-- Оплата и персональные данные в блокчейн не попадают - они в PostgreSQL
-- Смена статуса подписывается сервисным кошельком бэкенда
-- Историю статусов нельзя подделать задним числом
+
+Собственная цепочка блоков на Python (см. `backend/app/blockchain/`):
+
+- Блок — список записей о смене статусов + метка времени + SHA-256 хэш
+- Каждый блок ссылается на хэш предыдущего (`previous_hash`)
+- В блокчейне хранятся только статусы сделок и ссылки на файлы с хэшами;
+  персональные данные и оплата остаются в PostgreSQL
+- Цепочка каждой ноды хранится в отдельном JSON-файле и проверяется при загрузке
+- Две ноды обмениваются блоками по HTTP-протоколу (см. сетевую демонстрацию выше)
+
 ---
 
 ## Тех. стек
 
-- Frontend:  React + TypeScript + Tailwind + viem
-- Backend:   FastAPI + PostgreSQL + SQLAlchemy
-- Контракт:  Solidity + Hardhat (локальный блокчейн)
-- Связь:     backend подписывает tx сервисным кошельком
+- Frontend:  React 19 + TypeScript + Tailwind CSS 4 + Vite (SPA)
+- Backend:   FastAPI + SQLAlchemy + PostgreSQL (сделки и трекинг)
+- Блокчейн:  собственная реализация — Python, JSON-хранилище, SHA-256
+- Сеть:      HTTP + JSON между нодами, общий `X-API-Key`
 - Инфра:     Docker + docker-compose
 ---
 
@@ -82,21 +88,27 @@ docker compose up --build
 
 ```mermaid
 flowchart LR
-    UI[Фронтенд<br/>React + viem]
-    API[Бэкенд API<br/>FastAPI]
-    DB[(PostgreSQL<br/>база данных)]
-    SC[Смарт-контракт<br/>Solidity]
-    HH[Hardhat<br/>локальный блокчейн]
+    UI[Фронтенд<br/>React SPA]
+    A[Node A<br/>FastAPI :8000]
+    B[Node B<br/>FastAPI :8001]
+    DB[(PostgreSQL<br/>сделки и трекинг)]
+    FA[(blockchain.json<br/>нода A)]
+    FB[(blockchain.json<br/>нода B)]
 
-    UI -->|REST-запросы| API
-    UI -->|чтение статусов| SC
-    API -->|SQLAlchemy| DB
-    API -->|подпись транзакций| SC
-    SC --- HH
+    UI -->|REST /api/v1| A
+    A -->|HTTP + X-API-Key| B
+    B -->|HTTP + X-API-Key| A
+    A --> FA
+    B --> FB
+    A --> DB
+    B --> DB
 ```
-- Frontend читает статусы из контракта напрямую через viem, остальное - через API
-- Backend подписывает транзакции смены статуса сервисным кошельком
-- В блокчейне - только статусы сделки, персональные данные и оплата - в PostgreSQL
+
+- Браузер работает только с Node A (nginx проксирует `/api` на неё)
+- Node A и Node B — независимые экземпляры с собственными цепочками;
+  блоки передаются вручную по HTTP, автоматической синхронизации нет
+- В PostgreSQL — сделки и точки трекинга; в блокчейне — только история статусов
+
 ---
 
 ## Ветвление и правила работы с Git
@@ -119,30 +131,34 @@ flowchart LR
 
 ```
 .
-├── contracts/          # Solidity + Hardhat
-│   ├── contracts/      # .sol файлы
-│   ├── scripts/        # скрипты деплоя
-│   └── test/           # тесты контракта
-├── backend/            # FastAPI бэкенд
+├── backend/            # FastAPI бэкенд (один образ = одна нода)
 │   ├── app/
-│   │   ├── api/        # API роуты
+│   │   ├── api/        # API роуты (deals, tracking, blockchain, network)
+│   │   ├── blockchain/ # Блоки, цепочка, хранилище JSON
 │   │   ├── core/       # Основная конфигурация
 │   │   ├── models/     # SQLAlchemy ORM модели
 │   │   ├── schemas/    # Pydantic схемы
 │   │   ├── services/   # Слой бизнес-логики
 │   │   └── db/         # Управление сессиями БД
-│   └── tests/          # Тесты бэкенда
-├── frontend/           # React фронтенд
+│   ├── tests/          # Тесты бэкенда (pytest)
+│   ├── alembic/        # Миграции БД
+│   ├── demo.py         # Демо сценариев блокчейна (одна нода)
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/           # React фронтенд (Vite + Tailwind)
 │   ├── src/
 │   │   ├── components/ # Переиспользуемые UI компоненты
-│   │   ├── pages/      # Компоненты страниц
+│   │   ├── pages/      # Страницы (включая /network — демо обмена блоками)
 │   │   ├── hooks/      # Custom React hooks
 │   │   ├── services/   # API вызовы
 │   │   ├── utils/      # Утилитные функции
 │   │   ├── context/    # React context провайдеры
 │   │   └── types/      # TypeScript типы
-│   └── public/         # Статические файлы
-├── docker-compose.yml
+│   ├── Dockerfile      # multi-stage: vite build → nginx + прокси на node-a
+│   └── nginx.conf
+├── docker-compose.yml  # node-a, node-b, frontend, postgres
+├── network_architecture.md   # архитектура сетевого взаимодействия
+├── network_protocol.md       # контракт API обмена блоками
 └── README.md           # Документация проекта
 ```
 
@@ -162,6 +178,15 @@ flowchart LR
 ## Документация
 
 - [Структура проекта](structure.md)
-- [Архитектура](ARCHITECTURE.md)
+- [Архитектура](architecture.md)
 - [Формат данных](data_format.md)
 - [Аналитика](analytics.md)
+- [Сетевая архитектура](network_architecture.md)
+- [Сетевой протокол](network_protocol.md)
+- [Сетевые тестовые сценарии](network_test_scenarios.md)
+
+## Доступ к API
+
+- Чтение каталога (`GET /deals`, `GET /blockchain` и т.п.) открыто — режим «только просмотр»
+- Запись (`POST`/`DELETE`) и все эндпоинты `/network/*` требуют заголовок `X-API-Key`
+- Тот же ключ используют ноды для межсерверных запросов (`PEERS_JSON` + `API_KEY`)

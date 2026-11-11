@@ -38,7 +38,8 @@ function ApiKeyControl() {
             />
           </label>
           <p className="mt-2 text-xs text-slate-500">
-            Нужен для создания сделок и смены статусов. Значение по умолчанию на бэкенде —{' '}
+            Нужен для создания сделок, смены статусов и страницы «Сеть нод».
+            Значение по умолчанию на бэкенде —{' '}
             <code className="rounded bg-slate-100 px-1">change-me</code>.
           </p>
         </div>

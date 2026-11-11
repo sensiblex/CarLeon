@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_network_service
-from app.blockchain.chain import InvalidBlockError
+from app.blockchain.chain import BLOCK_ALREADY_PRESENT, InvalidBlockError
 from app.core.config import settings
 from app.core.security import require_api_key
 from app.schemas.blockchain import BlockSubmission
@@ -69,10 +69,13 @@ def receive_block(
     except PeerNetworkError as error:
         _raise_peer_error(error)
     except InvalidBlockError as error:
+        already_present = bool(error.errors) and all(
+            item.type == BLOCK_ALREADY_PRESENT for item in error.errors
+        )
         raise HTTPException(
             status_code=422,
             detail={
-                "code": "invalid_block",
+                "code": "block_already_present" if already_present else "invalid_block",
                 "message": "Полученный блок не прошёл проверку",
                 "errors": [item.to_dict() for item in error.errors],
             },

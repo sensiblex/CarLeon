@@ -1,104 +1,72 @@
-# CarLeon 
+# CarLeon
 
 ## Структура проекта
 
 ```
 CarLeon/
-├── backend/                 # FastAPI бэкенд
+├── backend/                  # FastAPI бэкенд (один Docker-образ = одна нода)
 │   ├── app/
-│   │   ├── api/            # API роуты
-│   │   │   └── v1/         # API версия 1
-│   │   ├── core/           # Основная конфигурация (безопасность, настройки)
-│   │   ├── models/         # SQLAlchemy ORM модели
-│   │   ├── schemas/        # Pydantic схемы (request/response)
-│   │   ├── services/       # Слой бизнес-логики
-│   │   ├── db/             # Управление сессиями БД
-│   │   └── main.py         # Точка входа FastAPI приложения
-│   ├── tests/              # Тесты бэкенда
-│   ├── alembic/            # Миграции БД
-│   ├── requirements.txt    # Python зависимости
-│   └── .env                # Переменные окружения
+│   │   ├── api/
+│   │   │   ├── v1/           # REST-эндпоинты v1
+│   │   │   │   ├── deals.py          # сделки (CRUD)
+│   │   │   │   ├── tracking.py       # точки трекинга + запись в цепочку
+│   │   │   │   ├── blockchain.py     # чтение/проверка цепочки
+│   │   │   │   └── network.py        # узел↔узел: info, peers, блоки
+│   │   │   ├── deps.py        # зависимости FastAPI (сервисы)
+│   │   │   └── router.py      # сборка /api/v1
+│   │   ├── blockchain/        # Собственный блокчейн
+│   │   │   ├── block.py       # Block: хэш, сериализация
+│   │   │   ├── chain.py       # Blockchain: валидация, добавление блоков
+│   │   │   ├── storage.py     # JSON-хранилище (атомарная запись, загрузка)
+│   │   │   └── transaction.py # StatusChange, DealStatus, хэши файлов
+│   │   ├── core/              # config (env), security (X-API-Key)
+│   │   ├── models/            # SQLAlchemy ORM: Deal, TrackingPoint
+│   │   ├── schemas/           # Pydantic-схемы запросов/ответов
+│   │   ├── services/          # бизнес-логика
+│   │   │   ├── blockchain_service.py  # записи в цепочку, приём peer-блоков
+│   │   │   ├── network_service.py     # HTTP-клиент пиров, проверка совместимости
+│   │   │   ├── deal_service.py
+│   │   │   └── tracking_service.py
+│   │   ├── db/                # engine, сессии, Base
+│   │   └── main.py            # FastAPI app, lifespan
+│   ├── tests/                 # pytest: chain, API, сеть (10 тестов), трекинг
+│   ├── alembic/               # миграции БД (сейчас create_all на старте)
+│   ├── demo.py                # консольное демо блокчейна (одна нода)
+│   ├── data/                  # runtime JSON-цепочки (gitignored)
+│   ├── Dockerfile             # python:3.13-slim + uvicorn
+│   ├── requirements.txt
+│   └── .env.example
 │
-├── frontend/               # React фронтенд
+├── frontend/                  # React SPA (Vite + Tailwind)
 │   ├── src/
-│   │   ├── components/     # Переиспользуемые UI компоненты
-│   │   ├── pages/          # Компоненты страниц
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── services/       # API вызовы
-│   │   ├── utils/          # Утилитные функции
-│   │   ├── context/        # React context провайдеры
-│   │   ├── types/          # TypeScript типы
-│   │   └── App.tsx         # Главный React компонент
-│   ├── public/             # Статические файлы
-│   ├── package.json        # Node зависимости
-│   └── .env                # Переменные окружения
+│   │   ├── components/        # Layout, StatusBadge, StatusProgress, ui
+│   │   ├── pages/             # TrackPage, DealsPage, DealPage,
+│   │   │                      # ChainPage, NetworkPage (демо обмена блоками)
+│   │   ├── hooks/             # useAsync
+│   │   ├── services/api.ts    # API-клиент
+│   │   ├── utils/             # статусы, форматирование
+│   │   ├── context/           # ApiKeyContext (X-API-Key)
+│   │   └── types/             # TypeScript-типы ответов API
+│   ├── Dockerfile             # multi-stage: vite build → nginx
+│   ├── nginx.conf             # статика + прокси /api → node-a:8000
+│   └── package.json
 │
-└── README.md              # Документация проекта
+├── docker-compose.yml         # node-a :8000, node-b :8001, frontend :3001, postgres
+├── architecture.md            # общая архитектура
+├── network_architecture.md    # сетевое взаимодействие нод (спринт 4)
+├── network_protocol.md        # контракт peer-API
+├── network_test_scenarios.md  # позитивные/негативные сценарии
+├── data_format.md             # форматы блоков, записей, API
+├── analytics.md               # целевые метрики и отчёты
+├── structure.md               # этот файл
+└── README.md
 ```
 
-## Структура бэкенда (FastAPI)
+## Ключевые потоки
 
-### `app/api/v1/`
-- Определения API endpoints
-- Обработчики роутов
-- Валидация request/response
-
-### `app/core/`
-- Настройки конфигурации
-- Безопасность (JWT, хеширование паролей)
-- CORS настройки
-- Подключение к БД
-
-### `app/models/`
-- SQLAlchemy ORM модели
-- Определения таблиц БД
-
-### `app/schemas/`
-- Pydantic модели для валидации
-- Схемы request/response
-
-### `app/services/`
-- Бизнес-логика
-- Обработка данных
-- Интеграции с внешними API
-
-### `app/db/`
-- Управление сессиями БД
-- Инициализация подключения
-
-## Структура фронтенда (React)
-
-### `src/components/`
-- Переиспользуемые UI компоненты
-- Atomic design паттерн
-- Презентационные компоненты
-
-### `src/pages/`
-- Компоненты уровня страниц
-- Обработчики роутов
-- Сложные UI сборки
-
-### `src/hooks/`
-- Custom React hooks
-- Управление состоянием
-- Hooks для интеграции с API
-
-### `src/services/`
-- Функции API клиента
-- HTTP запросы к бэкенду
-- Логика получения данных
-
-### `src/utils/`
-- Helper функции
-- Константы
-- Форматтеры
-
-### `src/context/`
-- React Context провайдеры
-- Глобальное управление состоянием
-- Контекст аутентификации
-
-### `src/types/`
-- Определения TypeScript типов
-- Интерфейсы
-- Type guards
+- **Смена статуса**: `POST /deals/{track}/tracking` → запись `TrackingPoint`
+  в PostgreSQL + `StatusChange` в новый блок JSON-цепочки (`tx_hash`,
+  `block_index` проставляются в точку трекинга).
+- Обмен блоками между нодами и модель доступа — см.
+  [network_architecture.md](network_architecture.md) и
+  [network_protocol.md](network_protocol.md).
